@@ -1,11 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { neon } from '@neondatabase/serverless';
+import postgres from 'postgres';
 
 export const config = {
   runtime: 'nodejs18.x',
 };
 
-const getConnectionString = () => process.env.POSTGRES_URL || process.env.DATABASE_URL;
+const getConnectionString = () => process.env.DATABASE_URL || process.env.POSTGRES_URL;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -32,26 +32,38 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const sql = neon(connectionString);
+    const sql = postgres(connectionString, { ssl: 'verify-full' });
 
     await sql`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
-        fullName TEXT NOT NULL,
-        companyName TEXT,
-        workEmail TEXT NOT NULL,
-        phoneNumber TEXT,
+        fullname TEXT NOT NULL,
+        companyname TEXT,
+        workemail TEXT NOT NULL,
+        phonenumber TEXT,
         industry TEXT,
-        lookingFor TEXT,
+        lookingfor TEXT,
         message TEXT NOT NULL,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        createdat TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `;
 
     const result = await sql`
-      SELECT * FROM messages 
-      ORDER BY createdAt DESC
+      SELECT
+        id,
+        fullname AS "fullName",
+        companyname AS "companyName",
+        workemail AS "workEmail",
+        phonenumber AS "phoneNumber",
+        industry,
+        lookingfor AS "lookingFor",
+        message,
+        createdat AS "createdAt"
+      FROM messages
+      ORDER BY createdat DESC
     `;
+
+    await sql.end({ timeout: 5 });
 
     const messages = Array.isArray(result) ? result : [];
     console.log(`✓ Fetched ${messages.length} messages from Neon DB`);
