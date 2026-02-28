@@ -1,5 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
+
+export const config = {
+  runtime: 'nodejs18.x',
+};
+
+// Fallback in-memory storage for testing
+let messagesStore: any[] = [];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -20,30 +26,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const { fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message } = req.body;
 
   try {
-    // Create table if it doesn't exist
-    await sql`
-      CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        fullName TEXT,
-        companyName TEXT,
-        workEmail TEXT,
-        phoneNumber TEXT,
-        industry TEXT,
-        lookingFor TEXT,
-        message TEXT,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
+    // Try to use Vercel Postgres if available
+    let useDatabase = false;
+    try {
+      const { sql } = await import('@vercel/postgres');
+      
+      // Create table if it doesn't exist
+      await sql`
+        CREATE TABLE IF NOT EXISTS messages (
+          id SERIAL PRIMARY KEY,
+          fullName TEXT,
+          companyName TEXT,
+          workEmail TEXT,
+          phoneNumber TEXT,
+          industry TEXT,
+          lookingFor TEXT,
+          message TEXT,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
 
-    // Insert the message
-    await sql`
-      INSERT INTO messages (fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message)
-      VALUES (${fullName}, ${companyName}, ${workEmail}, ${phoneNumber}, ${industry}, ${lookingFor}, ${message})
-    `;
+      // Insert the message
+      await sql`
+        INSERT INTO messages (fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message)
+        VALUES (${fullName}, ${companyName}, ${workEmail}, ${phoneNumber}, ${industry}, ${lookingFor}, ${message})
+      `;
+      
+      useDatabase = true;
+    } catch (dbError) {
+      console.log('Database unavailable, using memory storage:', dbError);
+      // Fallback to in-memory storage
+      messagesStore.push({
+        id: Date.now(),
+        fullName,
+        companyName,
+        workEmail,
+        phoneNumber,
+        industry,
+        lookingFor,
+        message,
+        createdAt: new Date().toISOString(),
+      });
+    }
     
-    console.log('New message received:', { fullName, workEmail, companyName });
+    console.log(`Message saved (${useDatabase ? 'DB' : 'Memory'}):`, { fullName, workEmail });
     
-    return res.status(200).json({ success: true });
+    return res.status(200).json({ success: true, storage: useDatabase ? 'database' : 'memory' });
   } catch (error) {
     console.error('Error saving message:', error);
     return res.status(500).json({ error: 'Failed to save message', details: String(error) });

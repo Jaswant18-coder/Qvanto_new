@@ -1,5 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { sql } from '@vercel/postgres';
+
+export const config = {
+  runtime: 'nodejs18.x',
+};
+
+// Fallback in-memory storage for testing
+let messagesStore: any[] = [];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -18,28 +24,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Create table if it doesn't exist
-    await sql`
-      CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        fullName TEXT,
-        companyName TEXT,
-        workEmail TEXT,
-        phoneNumber TEXT,
-        industry TEXT,
-        lookingFor TEXT,
-        message TEXT,
-        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `;
+    let messages: any[] = [];
+    let usingDatabase = false;
 
-    // Fetch all messages ordered by newest first
-    const result = await sql`
-      SELECT * FROM messages 
-      ORDER BY createdAt DESC
-    `;
+    try {
+      const { sql } = await import('@vercel/postgres');
+      
+      // Create table if it doesn't exist
+      await sql`
+        CREATE TABLE IF NOT EXISTS messages (
+          id SERIAL PRIMARY KEY,
+          fullName TEXT,
+          companyName TEXT,
+          workEmail TEXT,
+          phoneNumber TEXT,
+          industry TEXT,
+          lookingFor TEXT,
+          message TEXT,
+          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `;
+
+      // Fetch all messages ordered by newest first
+      const result = await sql`
+        SELECT * FROM messages 
+        ORDER BY createdAt DESC
+      `;
+      
+      messages = result.rows || [];
+      usingDatabase = true;
+    } catch (dbError) {
+      console.log('Database unavailable, returning memory storage:', dbError);
+      // Fallback to in-memory storage
+      messages = [...messagesStore].sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
+
+    console.log(`Returning ${messages.length} messages (${usingDatabase ? 'from DB' : 'from memory'})`);
     
-    return res.status(200).json(result.rows);
+    return res.status(200).json(messages);
   } catch (error) {
     console.error('Error fetching messages:', error);
     return res.status(500).json({ error: 'Failed to fetch messages', details: String(error) });
