@@ -25,18 +25,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const connectionString = getConnectionString();
-    console.log('[DEBUG] DATABASE_URL:', process.env.DATABASE_URL ? 'SET' : 'NOT SET');
-    console.log('[DEBUG] POSTGRES_URL:', process.env.POSTGRES_URL ? 'SET' : 'NOT SET');
-    console.log('[DEBUG] connectionString:', connectionString ? 'RESOLVED' : 'NOT RESOLVED');
-    
     if (!connectionString) {
       return res.status(500).json({
         error: 'Database is not configured',
         details: 'Set POSTGRES_URL or DATABASE_URL in Vercel Environment Variables for this environment.',
-        debug: {
-          DATABASE_URL: process.env.DATABASE_URL ? 'SET' : 'NOT SET',
-          POSTGRES_URL: process.env.POSTGRES_URL ? 'SET' : 'NOT SET'
-        }
       });
     }
 
