@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Mail, User, Building2, Phone, Tag, MessageSquare, Clock, RefreshCw } from 'lucide-react';
+import { Mail, User, Building2, Phone, Tag, MessageSquare, Clock, RefreshCw, Lock } from 'lucide-react';
 
 interface Message {
   id: number;
@@ -18,6 +18,23 @@ export default function Admin() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState('');
+
+  // Password can be set via environment variable or hardcoded
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'qvanto2024';
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password === ADMIN_PASSWORD) {
+      setIsAuthenticated(true);
+      setAuthError('');
+      setPassword('');
+    } else {
+      setAuthError('Incorrect password. Please try again.');
+    }
+  };
 
   const fetchMessages = useCallback(async (silent = false) => {
     if (!silent) {
@@ -52,6 +69,8 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
+    if (!isAuthenticated) return;
+
     fetchMessages();
 
     const pollId = window.setInterval(() => {
@@ -70,7 +89,63 @@ export default function Admin() {
       window.removeEventListener('focus', refreshOnFocus);
       document.removeEventListener('visibilitychange', refreshOnFocus);
     };
-  }, [fetchMessages]);
+  }, [fetchMessages, isAuthenticated]);
+
+  // Show login form if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-brand-dark min-h-screen pt-32 pb-20 flex items-center justify-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="glass-card p-12 max-w-md w-full mx-4"
+        >
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 rounded-full bg-brand-blue/10 flex items-center justify-center mx-auto mb-6">
+              <Lock className="text-brand-blue" size={28} />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Admin Access</h1>
+            <p className="text-white/40 text-sm">Enter password to view form inquiries</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setAuthError('');
+                }}
+                placeholder="Enter admin password"
+                className="w-full px-6 py-4 rounded-xl bg-white/5 border border-white/10 text-white placeholder:text-white/30 focus:outline-none focus:border-brand-blue transition-all"
+                autoFocus
+              />
+              {authError && (
+                <motion.p 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-red-400 text-xs mt-2 ml-2"
+                >
+                  {authError}
+                </motion.p>
+              )}
+            </div>
+
+            <motion.button
+              type="submit"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              className="w-full py-4 rounded-xl bg-brand-blue text-white font-bold uppercase tracking-widest text-xs hover:bg-brand-blue/90 transition-all"
+            >
+              Access Dashboard
+            </motion.button>
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-brand-dark min-h-screen pt-32 pb-20">
@@ -82,13 +157,22 @@ export default function Admin() {
             </div>
             <h1 className="text-4xl md:text-6xl font-medium text-white">Form Inquiries</h1>
           </div>
-          <button 
-            onClick={fetchMessages}
-            className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-            Refresh
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={fetchMessages}
+              className="flex items-center gap-2 px-6 py-3 bg-white/5 border border-white/10 rounded-lg text-xs font-bold uppercase tracking-widest text-white/60 hover:text-white hover:bg-white/10 transition-all"
+            >
+              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+              Refresh
+            </button>
+            <button 
+              onClick={() => setIsAuthenticated(false)}
+              className="flex items-center gap-2 px-6 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-xs font-bold uppercase tracking-widest text-red-400 hover:text-red-300 hover:bg-red-500/20 transition-all"
+            >
+              <Lock size={14} />
+              Logout
+            </button>
+          </div>
         </div>
 
         {loading ? (
