@@ -213,10 +213,11 @@ export default function About() {
             <h2 className="text-4xl md:text-6xl font-medium tracking-tight text-white mb-6">Meet the Founders</h2>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12 max-w-4xl mx-auto">
+          <div className="grid md:grid-cols-3 gap-12 mx-auto">
             {[
               { name: 'Pooja Palani', role: 'Founder', creds: 'B.Tech ECE | BS Data Science' },
               { name: 'Subashini Palani', role: 'Founder', creds: 'B.Sc B.Ed | Diploma in Computer Applications' },
+              { name: 'Pradeep Ravichandran', role: 'CTO', creds: 'Torro AI Founder' },
             ].map((founder, i) => (
               <motion.div 
                 key={i}

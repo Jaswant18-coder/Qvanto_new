@@ -258,55 +258,6 @@ export default function Product({ setCurrentPage }: ProductProps) {
           </div>
         </div>
       </section>
-
-      {/* Pricing Section */}
-      <section className="py-32 relative">
-        <div className="max-content">
-          <div className="text-center mb-24">
-            <div className="inline-block px-4 py-1 rounded-md bg-white/5 border border-white/10 text-[10px] font-bold uppercase tracking-widest text-white/60 mb-6">
-              ■ Pricing
-            </div>
-            <h2 className="text-4xl md:text-6xl font-medium tracking-tight text-white mb-6">Flexible Plans for Every Enterprise</h2>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              { name: 'Base Tier', desc: 'Automation + Governance', price: '₹2–4L / year', btn: 'Get Started' },
-              { name: 'Enterprise Tier', desc: 'Full AI Enablement', price: '₹10–15L / year', btn: 'Talk to Sales', highlight: true },
-              { name: 'Consultancy', desc: 'Implementation & Compliance for large enterprises', price: 'Custom Pricing', btn: 'Contact Us' },
-            ].map((plan, i) => (
-              <motion.div 
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5, delay: i * 0.1 }}
-                viewport={{ once: true }}
-                whileHover={{ y: -10 }}
-                className={`p-12 rounded-[40px] flex flex-col relative overflow-hidden transition-all ${plan.highlight ? 'bg-brand-blue text-white shadow-2xl scale-105 z-10' : 'glass-card'}`}
-              >
-                {plan.highlight && (
-                  <motion.div 
-                    animate={{ x: [0, 20, -20, 0], y: [0, -20, 20, 0] }}
-                    transition={{ duration: 6, repeat: Infinity }}
-                    className="absolute top-0 right-0 w-32 h-32 bg-white/20 blur-[60px] -translate-y-1/2 translate-x-1/2"
-                  ></motion.div>
-                )}
-                <h4 className="font-bold text-xl mb-2 relative z-10">{plan.name}</h4>
-                <p className={`text-sm mb-12 font-medium relative z-10 ${plan.highlight ? 'text-white/80' : 'text-white/40'}`}>{plan.desc}</p>
-                <div className="text-3xl font-bold mb-12 tracking-tight relative z-10">{plan.price}</div>
-                <motion.button 
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentPage('contact')} 
-                  className={`mt-auto py-4 rounded-full font-bold uppercase tracking-widest text-[10px] transition-all relative z-10 ${plan.highlight ? 'bg-brand-dark text-white hover:bg-white hover:text-brand-blue' : 'bg-white text-brand-dark hover:bg-brand-blue hover:text-white'}`}
-                >
-                  {plan.btn}
-                </motion.button>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
