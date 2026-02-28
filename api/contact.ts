@@ -5,8 +5,7 @@ export const config = {
   runtime: 'nodejs18.x',
 };
 
-// Fallback in-memory storage
-let messagesStore: any[] = [];
+const getConnectionString = () => process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -32,63 +31,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    let useDatabase = false;
-
-    // Try to use Neon database if connection string is available
-    if (process.env.POSTGRES_URL) {
-      try {
-        const sql = neon(process.env.POSTGRES_URL);
-
-        // Create table if it doesn't exist
-        await sql`
-          CREATE TABLE IF NOT EXISTS messages (
-            id SERIAL PRIMARY KEY,
-            fullName TEXT NOT NULL,
-            companyName TEXT,
-            workEmail TEXT NOT NULL,
-            phoneNumber TEXT,
-            industry TEXT,
-            lookingFor TEXT,
-            message TEXT NOT NULL,
-            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `;
-
-        // Insert the message
-        await sql`
-          INSERT INTO messages (fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message)
-          VALUES (${fullName}, ${companyName}, ${workEmail}, ${phoneNumber}, ${industry}, ${lookingFor}, ${message})
-        `;
-
-        useDatabase = true;
-        console.log(`✓ Message saved to Neon DB: ${fullName} (${workEmail})`);
-      } catch (dbError) {
-        console.error('Neon database error:', dbError);
-        // Fall through to memory storage
-      }
-    } else {
-      console.warn('⚠ POSTGRES_URL not set - using memory storage');
-    }
-
-    // Fallback to memory storage if database isn't available
-    if (!useDatabase) {
-      messagesStore.push({
-        id: messagesStore.length + 1,
-        fullName,
-        companyName,
-        workEmail,
-        phoneNumber,
-        industry,
-        lookingFor,
-        message,
-        createdAt: new Date().toISOString(),
+    const connectionString = getConnectionString();
+    if (!connectionString) {
+      return res.status(500).json({
+        error: 'Database is not configured',
+        details: 'Set POSTGRES_URL or DATABASE_URL in Vercel Environment Variables for this environment.',
       });
-      console.log(`✓ Message saved to memory: ${fullName} (${workEmail})`);
     }
+
+    const sql = neon(connectionString);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        fullName TEXT NOT NULL,
+        companyName TEXT,
+        workEmail TEXT NOT NULL,
+        phoneNumber TEXT,
+        industry TEXT,
+        lookingFor TEXT,
+        message TEXT NOT NULL,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    await sql`
+      INSERT INTO messages (fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message)
+      VALUES (${fullName}, ${companyName}, ${workEmail}, ${phoneNumber}, ${industry}, ${lookingFor}, ${message})
+    `;
+
+    console.log(`✓ Message saved to Neon DB: ${fullName} (${workEmail})`);
 
     return res.status(200).json({ 
       success: true, 
-      storage: useDatabase ? 'neon-database' : 'memory' 
+      storage: 'neon-database' 
     });
   } catch (error) {
     console.error('Error in /api/contact:', error);

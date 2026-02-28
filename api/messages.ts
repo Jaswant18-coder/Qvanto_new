@@ -5,8 +5,7 @@ export const config = {
   runtime: 'nodejs18.x',
 };
 
-// Fallback in-memory storage
-let messagesStore: any[] = [];
+const getConnectionString = () => process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Enable CORS
@@ -25,53 +24,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    let messages: any[] = [];
-    let usingDatabase = false;
-
-    // Try to use Neon database if connection string is available
-    if (process.env.POSTGRES_URL) {
-      try {
-        const sql = neon(process.env.POSTGRES_URL);
-
-        // Create table if it doesn't exist
-        await sql`
-          CREATE TABLE IF NOT EXISTS messages (
-            id SERIAL PRIMARY KEY,
-            fullName TEXT NOT NULL,
-            companyName TEXT,
-            workEmail TEXT NOT NULL,
-            phoneNumber TEXT,
-            industry TEXT,
-            lookingFor TEXT,
-            message TEXT NOT NULL,
-            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-          )
-        `;
-
-        // Fetch all messages ordered by newest first
-        const result = await sql`
-          SELECT * FROM messages 
-          ORDER BY createdAt DESC
-        `;
-
-        messages = Array.isArray(result) ? result : [];
-        usingDatabase = true;
-        console.log(`✓ Fetched ${messages.length} messages from Neon DB`);
-      } catch (dbError) {
-        console.error('Neon database error:', dbError);
-        // Fall through to memory storage
-      }
-    } else {
-      console.warn('⚠ POSTGRES_URL not set - using memory storage');
+    const connectionString = getConnectionString();
+    if (!connectionString) {
+      return res.status(500).json({
+        error: 'Database is not configured',
+        details: 'Set POSTGRES_URL or DATABASE_URL in Vercel Environment Variables for this environment.',
+      });
     }
 
-    // Fallback to memory storage if database isn't available
-    if (!usingDatabase) {
-      messages = [...messagesStore].sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-      console.log(`✓ Returning ${messages.length} messages from memory`);
-    }
+    const sql = neon(connectionString);
+
+    await sql`
+      CREATE TABLE IF NOT EXISTS messages (
+        id SERIAL PRIMARY KEY,
+        fullName TEXT NOT NULL,
+        companyName TEXT,
+        workEmail TEXT NOT NULL,
+        phoneNumber TEXT,
+        industry TEXT,
+        lookingFor TEXT,
+        message TEXT NOT NULL,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `;
+
+    const result = await sql`
+      SELECT * FROM messages 
+      ORDER BY createdAt DESC
+    `;
+
+    const messages = Array.isArray(result) ? result : [];
+    console.log(`✓ Fetched ${messages.length} messages from Neon DB`);
 
     return res.status(200).json(messages);
   } catch (error) {
