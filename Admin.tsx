@@ -17,6 +17,7 @@ interface Message {
 export default function Admin() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const fetchMessages = useCallback(async (silent = false) => {
     if (!silent) {
@@ -35,9 +36,14 @@ export default function Admin() {
       if (response.ok) {
         const data = await response.json();
         setMessages(Array.isArray(data) ? data : []);
+        setErrorMessage('');
+      } else {
+        const errorPayload = await response.json().catch(() => null);
+        setErrorMessage(errorPayload?.details || errorPayload?.error || 'Failed to fetch messages');
       }
     } catch (error) {
       console.error("Failed to fetch messages:", error);
+      setErrorMessage('Failed to fetch messages');
     } finally {
       if (!silent) {
         setLoading(false);
@@ -89,6 +95,12 @@ export default function Admin() {
           <div className="flex flex-col items-center justify-center py-32 space-y-4">
             <div className="w-12 h-12 border-4 border-brand-blue/20 border-t-brand-blue rounded-full animate-spin"></div>
             <p className="text-white/40 font-medium">Loading inquiries...</p>
+          </div>
+        ) : errorMessage ? (
+          <div className="glass-card p-20 text-center border border-red-500/30">
+            <MessageSquare size={48} className="text-red-400/70 mx-auto mb-6" />
+            <h3 className="text-2xl font-bold text-white mb-2">Unable to load inquiries</h3>
+            <p className="text-red-300/90">{errorMessage}</p>
           </div>
         ) : messages.length === 0 ? (
           <div className="glass-card p-20 text-center">

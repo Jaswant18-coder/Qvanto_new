@@ -39,7 +39,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    const sql = postgres(connectionString, { ssl: 'verify-full' });
+    const sql = postgres(connectionString, {
+      ssl: 'require',
+      prepare: false,
+      max: 1,
+    });
 
     await sql`
       CREATE TABLE IF NOT EXISTS messages (

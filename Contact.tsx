@@ -12,7 +12,8 @@ import {
 } from 'lucide-react';
 
 export default function Contact() {
-  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [formStatus, setFormStatus] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
+  const [submitError, setSubmitError] = useState('');
   const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
 
@@ -20,6 +21,7 @@ export default function Contact() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setFormStatus('sending');
+    setSubmitError('');
     
     const formData = new FormData(e.currentTarget);
     const data = Object.fromEntries(formData.entries());
@@ -34,19 +36,19 @@ export default function Contact() {
       if (response.ok) {
         setFormStatus('sent');
       } else {
-        throw new Error('Failed to send');
+        const errorPayload = await response.json().catch(() => null);
+        throw new Error(errorPayload?.details || errorPayload?.error || 'Failed to send');
       }
     } catch (error) {
       console.error('Error:', error);
-      // Show success message even if API is not available (graceful fallback)
-      // In production with backend, this would save to database
-      setFormStatus('sent');
-      console.log('Message data (backend not available):', data);
+      setFormStatus('error');
+      setSubmitError(error instanceof Error ? error.message : 'Failed to send message. Please try again.');
     }
   };
 
   const handleReset = () => {
     setFormStatus('idle');
+    setSubmitError('');
   };
 
   const faqs = [
@@ -247,11 +249,16 @@ export default function Contact() {
                           ></textarea>
                         </div>
                         <div className="mt-auto pt-6">
+                          {formStatus === 'error' && (
+                            <p className="mb-4 text-sm text-red-400 border border-red-500/30 bg-red-500/10 rounded-lg px-4 py-3">
+                              {submitError}
+                            </p>
+                          )}
                           <button 
-                            disabled={formStatus !== 'idle'}
+                            disabled={formStatus === 'sending'}
                             className="w-full py-5 bg-brand-blue text-white rounded-lg font-bold uppercase tracking-widest text-xs hover:bg-brand-blue/80 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
                           >
-                            {formStatus === 'idle' && (
+                            {(formStatus === 'idle' || formStatus === 'error') && (
                               <>
                                 Send Message <Send size={16} />
                               </>
