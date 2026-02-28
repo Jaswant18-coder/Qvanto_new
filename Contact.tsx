@@ -135,7 +135,7 @@ export default function Contact() {
             </div>
 
             {/* Contact Form */}
-            <div className="glass-card p-12 relative overflow-hidden min-h-[600px] flex flex-col">
+            <div className="glass-card p-12 relative overflow-hidden min-h-150 flex flex-col">
               <div className="relative z-10 flex-1 flex flex-col">
                 <AnimatePresence mode="wait">
                   {formStatus === 'sent' ? (

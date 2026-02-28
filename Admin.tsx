@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { Mail, User, Building2, Phone, Tag, MessageSquare, Clock, Trash2, RefreshCw } from 'lucide-react';
+import { Mail, User, Building2, Phone, Tag, MessageSquare, Clock, RefreshCw } from 'lucide-react';
 
 interface Message {
   id: number;
@@ -18,24 +18,53 @@ export default function Admin() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchMessages = async () => {
-    setLoading(true);
+  const fetchMessages = useCallback(async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    }
+
     try {
-      const response = await fetch('/api/messages');
+      const response = await fetch('/api/messages', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          Pragma: 'no-cache',
+        },
+      });
+
       if (response.ok) {
         const data = await response.json();
-        setMessages(data);
+        setMessages(Array.isArray(data) ? data : []);
       }
     } catch (error) {
       console.error("Failed to fetch messages:", error);
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchMessages();
-  }, []);
+
+    const pollId = window.setInterval(() => {
+      fetchMessages(true);
+    }, 10000);
+
+    const refreshOnFocus = () => {
+      fetchMessages(true);
+    };
+
+    window.addEventListener('focus', refreshOnFocus);
+    document.addEventListener('visibilitychange', refreshOnFocus);
+
+    return () => {
+      window.clearInterval(pollId);
+      window.removeEventListener('focus', refreshOnFocus);
+      document.removeEventListener('visibilitychange', refreshOnFocus);
+    };
+  }, [fetchMessages]);
 
   return (
     <div className="bg-brand-dark min-h-screen pt-32 pb-20">
@@ -68,13 +97,39 @@ export default function Admin() {
             <p className="text-white/40">When users submit the contact form, they will appear here.</p>
           </div>
         ) : (
-          <div className="grid gap-6">
+          <motion.div
+            className="grid gap-6"
+            initial="hidden"
+            animate="visible"
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: 0.06,
+                  delayChildren: 0.02,
+                },
+              },
+            }}
+          >
             {messages.map((msg) => (
               <motion.div 
                 key={msg.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="glass-card p-8 group hover:border-brand-blue/30 transition-all"
+                variants={{
+                  hidden: { opacity: 0, y: 14 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      type: 'spring',
+                      stiffness: 130,
+                      damping: 20,
+                      mass: 0.7,
+                    },
+                  },
+                }}
+                layout
+                className="glass-card p-8 group hover:border-brand-blue/30 transition-all duration-300 ease-out"
               >
                 <div className="grid lg:grid-cols-3 gap-8">
                   <div className="space-y-4">
@@ -154,7 +209,7 @@ export default function Admin() {
                 </div>
               </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
     </div>
