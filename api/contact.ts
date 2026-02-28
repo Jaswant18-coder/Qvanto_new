@@ -1,10 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { neon } from '@neondatabase/serverless';
 
 export const config = {
   runtime: 'nodejs18.x',
 };
 
-// Fallback in-memory storage for testing
+// Fallback in-memory storage
 let messagesStore: any[] = [];
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -25,39 +26,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const { fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message } = req.body;
 
-  try {
-    // Try to use Vercel Postgres if available
-    let useDatabase = false;
-    try {
-      const { sql } = await import('@vercel/postgres');
-      
-      // Create table if it doesn't exist
-      await sql`
-        CREATE TABLE IF NOT EXISTS messages (
-          id SERIAL PRIMARY KEY,
-          fullName TEXT,
-          companyName TEXT,
-          workEmail TEXT,
-          phoneNumber TEXT,
-          industry TEXT,
-          lookingFor TEXT,
-          message TEXT,
-          createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-      `;
+  // Validate inputs
+  if (!fullName || !workEmail || !message) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
 
-      // Insert the message
-      await sql`
-        INSERT INTO messages (fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message)
-        VALUES (${fullName}, ${companyName}, ${workEmail}, ${phoneNumber}, ${industry}, ${lookingFor}, ${message})
-      `;
-      
-      useDatabase = true;
-    } catch (dbError) {
-      console.log('Database unavailable, using memory storage:', dbError);
-      // Fallback to in-memory storage
+  try {
+    let useDatabase = false;
+
+    // Try to use Neon database if connection string is available
+    if (process.env.POSTGRES_URL) {
+      try {
+        const sql = neon(process.env.POSTGRES_URL);
+
+        // Create table if it doesn't exist
+        await sql`
+          CREATE TABLE IF NOT EXISTS messages (
+            id SERIAL PRIMARY KEY,
+            fullName TEXT NOT NULL,
+            companyName TEXT,
+            workEmail TEXT NOT NULL,
+            phoneNumber TEXT,
+            industry TEXT,
+            lookingFor TEXT,
+            message TEXT NOT NULL,
+            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          )
+        `;
+
+        // Insert the message
+        await sql`
+          INSERT INTO messages (fullName, companyName, workEmail, phoneNumber, industry, lookingFor, message)
+          VALUES (${fullName}, ${companyName}, ${workEmail}, ${phoneNumber}, ${industry}, ${lookingFor}, ${message})
+        `;
+
+        useDatabase = true;
+        console.log(`✓ Message saved to Neon DB: ${fullName} (${workEmail})`);
+      } catch (dbError) {
+        console.error('Neon database error:', dbError);
+        // Fall through to memory storage
+      }
+    } else {
+      console.warn('⚠ POSTGRES_URL not set - using memory storage');
+    }
+
+    // Fallback to memory storage if database isn't available
+    if (!useDatabase) {
       messagesStore.push({
-        id: Date.now(),
+        id: messagesStore.length + 1,
         fullName,
         companyName,
         workEmail,
@@ -67,13 +83,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         message,
         createdAt: new Date().toISOString(),
       });
+      console.log(`✓ Message saved to memory: ${fullName} (${workEmail})`);
     }
-    
-    console.log(`Message saved (${useDatabase ? 'DB' : 'Memory'}):`, { fullName, workEmail });
-    
-    return res.status(200).json({ success: true, storage: useDatabase ? 'database' : 'memory' });
+
+    return res.status(200).json({ 
+      success: true, 
+      storage: useDatabase ? 'neon-database' : 'memory' 
+    });
   } catch (error) {
-    console.error('Error saving message:', error);
-    return res.status(500).json({ error: 'Failed to save message', details: String(error) });
+    console.error('Error in /api/contact:', error);
+    return res.status(500).json({ 
+      error: 'Failed to save message', 
+      details: error instanceof Error ? error.message : String(error) 
+    });
   }
 }
