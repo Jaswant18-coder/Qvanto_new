@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import postgres from 'postgres';
 
 export const config = {
-  runtime: 'nodejs18.x',
+  runtime: 'nodejs',
 };
 
 const getConnectionString = () => process.env.DATABASE_URL || process.env.POSTGRES_URL;
